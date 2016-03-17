@@ -15,16 +15,16 @@
 
 // Used to transfer the final rendered display to the framebuffer
 #define DISPLAY_TRANSFER_FLAGS \
-	(GX_TRANSFER_FLIP_VERT(0) | GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0) | \
-	GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB8) | \
-	GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
+    (GX_TRANSFER_FLIP_VERT(0) | GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0) | \
+    GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB8) | \
+    GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
 
 // Used to convert textures to 3DS tiled format
 // Note: vertical flip flag set so 0,0 is top left of texture
 #define TEXTURE_TRANSFER_FLAGS \
-	(GX_TRANSFER_FLIP_VERT(1) | GX_TRANSFER_OUT_TILED(1) | GX_TRANSFER_RAW_COPY(0) | \
-	GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGBA8) | \
-	GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
+    (GX_TRANSFER_FLIP_VERT(1) | GX_TRANSFER_OUT_TILED(1) | GX_TRANSFER_RAW_COPY(0) | \
+    GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGBA8) | \
+    GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
 
 typedef struct {
     int width, height, real_width, real_height;
@@ -32,7 +32,7 @@ typedef struct {
 } Texture;
 
 typedef struct {
-	int x, y, width, height;
+    int x, y, width, height;
 } Sprite;
 
 typedef struct {
@@ -49,16 +49,13 @@ u32 next_pow_2(u32 i)
     i |= i >> 16;
     i++;
 
-    if (i < 64)
-    {
-        return 64;
-    }
-    return i;
+    return (i < 64)
+        ? 64 : i;
 }
 
 float easeLinear(int t, float b, float c, int d)
 {
-	return c * t / d + b;
+    return c * t / d + b;
 }
 
 void setFrameBound(int idx, float texture_width, float texture_height, Frame * frame)
@@ -107,20 +104,20 @@ static C3D_Mtx projection;
 
 static void load(Texture * texture, u8 const * data, u32 size, int id)
 {
-	unsigned char * image;
-	unsigned width, height;
+    unsigned char * image;
+    unsigned width, height;
 
-	lodepng_decode32(&image, &width, &height, data, size);
+    lodepng_decode32(&image, &width, &height, data, size);
 
     u32 pow2Width = next_pow_2(width);
     u32 pow2Height = next_pow_2(height);
 
     u32 texture_size = pow2Width * pow2Height * 4;
-	u8 * gpusrc = linearAlloc(texture_size);
+    u8 * gpusrc = linearAlloc(texture_size);
     memset(gpusrc, 0, texture_size);
 
-	// GX_DisplayTransfer needs input buffer in linear RAM
-	// lodepng outputs big endian rgba so we need to convert
+    // GX_DisplayTransfer needs input buffer in linear RAM
+    // lodepng outputs big endian rgba so we need to convert
     for (int x = 0; x < width; x++)
     {
         for (int y = 0; y < height; y++)
@@ -135,25 +132,25 @@ static void load(Texture * texture, u8 const * data, u32 size, int id)
         }
     }
 
-	// ensure data is in physical ram
-	GSPGPU_FlushDataCache(gpusrc, texture_size);
+    // ensure data is in physical ram
+    GSPGPU_FlushDataCache(gpusrc, texture_size);
 
-	C3D_TexInit(&texture->ptr, pow2Width, pow2Height, GPU_RGBA8);
+    C3D_TexInit(&texture->ptr, pow2Width, pow2Height, GPU_RGBA8);
 
-	// Convert image to 3DS tiled texture format
+    // Convert image to 3DS tiled texture format
     u32 dim = GX_BUFFER_DIM(pow2Width, pow2Height);
-	GX_DisplayTransfer(
+    GX_DisplayTransfer(
         (u32 *)gpusrc, dim,
         (u32 *)texture->ptr.data, dim,
         TEXTURE_TRANSFER_FLAGS
     );
-	gspWaitForPPF();
+    gspWaitForPPF();
 
-	C3D_TexSetFilter(&texture->ptr, GPU_LINEAR, GPU_NEAREST);
-	C3D_TexBind(id, &texture->ptr);
+    C3D_TexSetFilter(&texture->ptr, GPU_LINEAR, GPU_NEAREST);
+    C3D_TexBind(id, &texture->ptr);
 
-	free(image);
-	linearFree(gpusrc);
+    free(image);
+    linearFree(gpusrc);
 
     texture->width = width;
     texture->height = height;
@@ -163,47 +160,47 @@ static void load(Texture * texture, u8 const * data, u32 size, int id)
 
 static void sceneInit(Sprite * sprite)
 {
-	// Load the vertex shader, create a shader program and bind it
-	vshader_dvlb = DVLB_ParseFile((u32 *)vshader_shbin, vshader_shbin_size);
-	shaderProgramInit(&program);
-	shaderProgramSetVsh(&program, &vshader_dvlb->DVLE[0]);
-	C3D_BindProgram(&program);
+    // Load the vertex shader, create a shader program and bind it
+    vshader_dvlb = DVLB_ParseFile((u32 *)vshader_shbin, vshader_shbin_size);
+    shaderProgramInit(&program);
+    shaderProgramSetVsh(&program, &vshader_dvlb->DVLE[0]);
+    C3D_BindProgram(&program);
 
-	// Get the location of the uniforms
-	uLoc_projection = shaderInstanceGetUniformLocation(program.vertexShader, "projection");
+    // Get the location of the uniforms
+    uLoc_projection = shaderInstanceGetUniformLocation(program.vertexShader, "projection");
 
-	// Configure attributes for use with the vertex shader
-	// Attribute format and element count are ignored in immediate mode
-	C3D_AttrInfo * attrInfo = C3D_GetAttrInfo();
-	AttrInfo_Init(attrInfo);
-	AttrInfo_AddLoader(attrInfo, 0, GPU_FLOAT, 3); // v0=position
-	AttrInfo_AddLoader(attrInfo, 1, GPU_FLOAT, 2); // v2=texcoord
+    // Configure attributes for use with the vertex shader
+    // Attribute format and element count are ignored in immediate mode
+    C3D_AttrInfo * attrInfo = C3D_GetAttrInfo();
+    AttrInfo_Init(attrInfo);
+    AttrInfo_AddLoader(attrInfo, 0, GPU_FLOAT, 3); // v0=position
+    AttrInfo_AddLoader(attrInfo, 1, GPU_FLOAT, 2); // v2=texcoord
 
-	// Compute the projection matrix
-	// Note: we're setting top to 240 here so origin is at top left.
-	Mtx_OrthoTilt(&projection, 0.0, 400.0, 240.0, 0.0, 0.0, 1.0);
+    // Compute the projection matrix
+    // Note: we're setting top to 240 here so origin is at top left.
+    Mtx_OrthoTilt(&projection, 0.0, 400.0, 240.0, 0.0, 0.0, 1.0);
 
-	// Configure buffers
-	// C3D_BufInfo * bufInfo = C3D_GetBufInfo();
-	// BufInfo_Init(bufInfo);
+    // Configure buffers
+    // C3D_BufInfo * bufInfo = C3D_GetBufInfo();
+    // BufInfo_Init(bufInfo);
 
-	// Configure the first fragment shading substage to just pass through the texture color
-	// See https://www.opengl.org/sdk/docs/man2/xhtml/glTexEnv.xml for more insight
-	C3D_TexEnv * env = C3D_GetTexEnv(0);
-	C3D_TexEnvSrc(env, C3D_Both, GPU_TEXTURE0, 0, 0);
-	C3D_TexEnvOp(env, C3D_Both, 0, 0, 0);
-	C3D_TexEnvFunc(env, C3D_Both, GPU_REPLACE);
+    // Configure the first fragment shading substage to just pass through the texture color
+    // See https://www.opengl.org/sdk/docs/man2/xhtml/glTexEnv.xml for more insight
+    C3D_TexEnv * env = C3D_GetTexEnv(0);
+    C3D_TexEnvSrc(env, C3D_Both, GPU_TEXTURE0, 0, 0);
+    C3D_TexEnvOp(env, C3D_Both, 0, 0, 0);
+    C3D_TexEnvFunc(env, C3D_Both, GPU_REPLACE);
 
     sprite->width = 45;
     sprite->height = 45;
     sprite->x = (400 - sprite->width) / 2;
     sprite->y = (240 - sprite->height) / 2;
 
-	// Configure depth test to overwrite pixels with the same depth (needed to draw overlapping sprites)
-	C3D_DepthTest(true, GPU_GEQUAL, GPU_WRITE_ALL);
+    // Configure depth test to overwrite pixels with the same depth (needed to draw overlapping sprites)
+    C3D_DepthTest(true, GPU_GEQUAL, GPU_WRITE_ALL);
 
-	// Update the uniforms
-	C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uLoc_projection, &projection);
+    // Update the uniforms
+    C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uLoc_projection, &projection);
 }
 
 static void sceneRender(Sprite const * sprite, Frame const * frames, u64 elapsed, float offset3d)
@@ -216,41 +213,41 @@ static void sceneRender(Sprite const * sprite, Frame const * frames, u64 elapsed
 
 static void sceneExit(Texture * texture)
 {
-	// Free the shader program
-	shaderProgramFree(&program);
-	DVLB_Free(vshader_dvlb);
+    // Free the shader program
+    shaderProgramFree(&program);
+    DVLB_Free(vshader_dvlb);
 
     C3D_TexDelete(&texture->ptr);
 }
 
 int main(int argc, char ** argv)
 {
-	// Initialize graphics
-	gfxInitDefault();
+    // Initialize graphics
+    gfxInitDefault();
     gfxSet3D(true);
 
-	C3D_Init(C3D_DEFAULT_CMDBUF_SIZE);
+    C3D_Init(C3D_DEFAULT_CMDBUF_SIZE);
 
-	// Initialize the render target
-	C3D_RenderTarget * top_left = C3D_RenderTargetCreate(240, 400, GPU_RB_RGBA8, GPU_RB_DEPTH24_STENCIL8);
-	C3D_RenderTargetSetClear(top_left, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
-	C3D_RenderTargetSetOutput(top_left, GFX_TOP, GFX_LEFT, DISPLAY_TRANSFER_FLAGS);
+    // Initialize the render target
+    C3D_RenderTarget * top_left = C3D_RenderTargetCreate(240, 400, GPU_RB_RGBA8, GPU_RB_DEPTH24_STENCIL8);
+    C3D_RenderTargetSetClear(top_left, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
+    C3D_RenderTargetSetOutput(top_left, GFX_TOP, GFX_LEFT, DISPLAY_TRANSFER_FLAGS);
 
-	C3D_RenderTarget * top_right = C3D_RenderTargetCreate(240, 400, GPU_RB_RGBA8, GPU_RB_DEPTH24_STENCIL8);
-	C3D_RenderTargetSetClear(top_right, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
-	C3D_RenderTargetSetOutput(top_right, GFX_TOP, GFX_RIGHT, DISPLAY_TRANSFER_FLAGS);
+    C3D_RenderTarget * top_right = C3D_RenderTargetCreate(240, 400, GPU_RB_RGBA8, GPU_RB_DEPTH24_STENCIL8);
+    C3D_RenderTargetSetClear(top_right, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
+    C3D_RenderTargetSetOutput(top_right, GFX_TOP, GFX_RIGHT, DISPLAY_TRANSFER_FLAGS);
 
     consoleInit(GFX_BOTTOM, NULL);
-	printf("\x1b[15;10HPress Start to exit.");
+    printf("\x1b[15;10HPress Start to exit.");
 
     Sprite sprite;
     Texture texture;
 
-	// Load the texture
+    // Load the texture
     load(&texture, spritesheet_png, spritesheet_png_size, 0);
 
-	// Initialize the scene
-	sceneInit(&sprite);
+    // Initialize the scene
+    sceneInit(&sprite);
 
     float texture_width = (float)texture.width / texture.real_width;
     float texture_height = (float)texture.height / texture.real_height;
@@ -264,28 +261,30 @@ int main(int argc, char ** argv)
     circlePosition pos;
     touchPosition touch;
 
-	// Main loop
+    // Main loop
     u64 start = osGetTime();
-	while (aptMainLoop())
+    while (aptMainLoop())
     {
-		hidScanInput();
+        hidScanInput();
 
-		// Respond to user input
-		u32 kDown = hidKeysDown();
-		if (kDown & KEY_START)
-			break; // break in order to return to hbmenu
+        // Respond to user input
+        u32 kDown = hidKeysDown();
+        if (kDown & KEY_START)
+        {
+            break; // break in order to return to hbmenu
+        }
 
-		//Read the CirclePad position
-		hidCircleRead(&pos);
-		//Read the touch screen coordinates
-		hidTouchRead(&touch);
+        //Read the CirclePad position
+        hidCircleRead(&pos);
+        //Read the touch screen coordinates
+        hidTouchRead(&touch);
 
         u64 current = osGetTime();
 
-		//Print the CirclePad position
-		printf("\x1b[2;0H%04d; %04d", pos.dx, pos.dy);
-		//Print the touch screen coordinates
-		printf("\x1b[3;0H%03d; %03d", touch.px, touch.py);
+        //Print the CirclePad position
+        printf("\x1b[2;0H%04d; %04d", pos.dx, pos.dy);
+        //Print the touch screen coordinates
+        printf("\x1b[3;0H%03d; %03d", touch.px, touch.py);
 
         float iod = osGet3DSliderState() * 15;
         if (iod > 0.0f)
@@ -297,8 +296,8 @@ int main(int argc, char ** argv)
             printf("\x1b[4;0H3D disabled");
         }
 
-		// Render the scene
-		C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+        // Render the scene
+        C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
         {
             if (iod > 0.0f)
             {
@@ -314,17 +313,17 @@ int main(int argc, char ** argv)
                 sceneRender(&sprite, frames, current - start, 0);
             }
         }
-		C3D_FrameEnd(0);
-	}
+        C3D_FrameEnd(0);
+    }
 
-	// Deinitialize the scene
-	sceneExit(&texture);
+    // Deinitialize the scene
+    sceneExit(&texture);
 
     C3D_RenderTargetDelete(top_left);
     C3D_RenderTargetDelete(top_right);
 
-	// Deinitialize graphics
-	C3D_Fini();
-	gfxExit();
-	return 0;
+    // Deinitialize graphics
+    C3D_Fini();
+    gfxExit();
+    return 0;
 }
